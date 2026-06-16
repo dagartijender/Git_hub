@@ -12,6 +12,7 @@ It includes:
 - Security policy
 - Enterprise setup notes
 - Branch protection and governance checklist
+- Organization repository creation automation
 
 ## Project Goal
 
@@ -45,6 +46,8 @@ python3 -m src.app
 ## Suggested Learning Flow
 
 Start with [docs/enterprise-setup.md](docs/enterprise-setup.md), then follow [docs/day-one-checklist.md](docs/day-one-checklist.md).
+
+To automate repository creation inside an organization, read [docs/organization-automation.md](docs/organization-automation.md).
 
 ## Repository Structure
 

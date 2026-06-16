@@ -1,0 +1,127 @@
+name: Create organization repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      organization:
+        description: "GitHub organization name"
+        required: true
+        type: string
+      repository_name:
+        description: "New repository name"
+        required: true
+        type: string
+      description:
+        description: "Repository description"
+        required: false
+        default: "Created by GitHub Actions automation"
+        type: string
+      visibility:
+        description: "Repository visibility"
+        required: true
+        default: private
+        type: choice
+        options:
+          - private
+          - public
+          - internal
+      auto_init:
+        description: "Create initial README"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  create-repository:
+    name: Create repository in organization
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate inputs
+        shell: bash
+        env:
+          ORGANIZATION: ${{ inputs.organization }}
+          REPOSITORY_NAME: ${{ inputs.repository_name }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "${ORGANIZATION}" =~ ^[A-Za-z0-9][A-Za-z0-9-]*$ ]]; then
+            echo "Invalid organization name."
+            exit 1
+          fi
+
+          if [[ ! "${REPOSITORY_NAME}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "Invalid repository name."
+            exit 1
+          fi
+
+      - name: Build API payload
+        shell: bash
+        env:
+          REPOSITORY_NAME: ${{ inputs.repository_name }}
+          DESCRIPTION: ${{ inputs.description }}
+          VISIBILITY: ${{ inputs.visibility }}
+          AUTO_INIT: ${{ inputs.auto_init }}
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import json
+          import os
+
+          payload = {
+              "name": os.environ["REPOSITORY_NAME"],
+              "description": os.environ["DESCRIPTION"],
+              "visibility": os.environ["VISIBILITY"],
+              "auto_init": os.environ["AUTO_INIT"].lower() == "true",
+              "has_issues": True,
+              "has_projects": True,
+              "has_wiki": False,
+          }
+
+          with open("payload.json", "w", encoding="utf-8") as payload_file:
+              json.dump(payload, payload_file)
+          PY
+
+      - name: Create repository
+        shell: bash
+        env:
+          ORG_ADMIN_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          ORGANIZATION: ${{ inputs.organization }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${ORG_ADMIN_TOKEN}" ]]; then
+            echo "Missing ORG_ADMIN_TOKEN repository secret."
+            exit 1
+          fi
+
+          response_file="$(mktemp)"
+          status_code="$(
+            curl --silent --show-error --output "${response_file}" --write-out "%{http_code}" \
+              --request POST \
+              --url "https://api.github.com/orgs/${ORGANIZATION}/repos" \
+              --header "Accept: application/vnd.github+json" \
+              --header "Authorization: Bearer ${ORG_ADMIN_TOKEN}" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              --data @payload.json
+          )"
+
+          if [[ "${status_code}" != "201" ]]; then
+            echo "GitHub API returned HTTP ${status_code}."
+            cat "${response_file}"
+            exit 1
+          fi
+
+          python - "${response_file}" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as response_file:
+              repository = json.load(response_file)
+
+          print(f"Repository created: {repository['html_url']}")
+          PY
