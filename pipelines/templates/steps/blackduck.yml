@@ -1,0 +1,22 @@
+parameters:
+  - name: projectName
+    type: string
+  - name: workingDirectory
+    type: string
+
+steps:
+  - bash: |
+      set -euo pipefail
+      bash <(curl --fail --silent --show-error --location https://detect.synopsys.com/detect10.sh) \
+        --blackduck.url="${BLACKDUCK_URL}" \
+        --blackduck.api.token="${BLACKDUCK_TOKEN}" \
+        --detect.project.name="${PROJECT_NAME}" \
+        --detect.project.version.name="$(Build.SourceBranchName)-$(Build.BuildId)" \
+        --detect.source.path="${SOURCE_PATH}" \
+        --detect.policy.check.fail.on.severities=BLOCKER,CRITICAL
+    displayName: Run Black Duck policy scan
+    env:
+      BLACKDUCK_URL: $(blackDuckUrl)
+      BLACKDUCK_TOKEN: $(blackDuckToken)
+      PROJECT_NAME: ${{ parameters.projectName }}
+      SOURCE_PATH: $(Build.SourcesDirectory)/${{ parameters.workingDirectory }}

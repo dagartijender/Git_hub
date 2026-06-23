@@ -1,0 +1,52 @@
+parameters:
+  - name: serviceName
+    type: string
+  - name: vmImage
+    type: string
+  - name: workingDirectory
+    type: string
+  - name: artifactName
+    type: string
+  - name: veracodeApplicationProfile
+    type: string
+  - name: enableBlackDuck
+    type: boolean
+  - name: enableVeracode
+    type: boolean
+
+stages:
+  - stage: Security
+    displayName: Enterprise security gates
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - ${{ if eq(parameters.enableBlackDuck, true) }}:
+          - job: BlackDuck
+            pool:
+              vmImage: ${{ parameters.vmImage }}
+            steps:
+              - checkout: self
+              - template: ../steps/blackduck.yml
+                parameters:
+                  projectName: ${{ parameters.serviceName }}
+                  workingDirectory: ${{ parameters.workingDirectory }}
+
+      - ${{ if eq(parameters.enableVeracode, true) }}:
+          - job: Veracode
+            pool:
+              vmImage: ${{ parameters.vmImage }}
+            steps:
+              - checkout: none
+              - task: DownloadPipelineArtifact@2
+                inputs:
+                  artifact: ${{ parameters.artifactName }}
+                  path: $(Pipeline.Workspace)/${{ parameters.artifactName }}
+              - template: ../steps/veracode.yml
+                parameters:
+                  applicationProfile: ${{ parameters.veracodeApplicationProfile }}
+                  artifactPath: $(Pipeline.Workspace)/${{ parameters.artifactName }}
+
+      - ${{ if and(eq(parameters.enableBlackDuck, false), eq(parameters.enableVeracode, false)) }}:
+          - job: SecurityDisabled
+            steps:
+              - bash: echo "Optional Black Duck and Veracode scans are disabled."

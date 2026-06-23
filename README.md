@@ -1,159 +1,194 @@
-# Azure DevOps to AKS GitOps Reference Project
+# Enterprise Azure DevOps Central Pipeline Templates
 
-A production-minded reference implementation of CI with Azure DevOps and
-continuous delivery with ArgoCD.
+A portfolio-ready reference project based on a common enterprise platform
+engineering model: many microservices consume one centrally governed Azure
+DevOps pipeline.
 
-Azure DevOps builds and verifies the application, scans it with SonarQube,
-Black Duck, and Veracode, publishes an immutable container tag to Azure
-Container Registry (ACR), then commits that tag to a separate GitOps
-repository. ArgoCD—not the pipeline—reconciles the change into AKS.
+Service teams supply parameters and their language-specific build steps. The
+central templates enforce build, artifact publication, SonarQube, secret
+scanning, Black Duck, Veracode, container publishing to ACR, and GitOps
+promotion.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    Developer[Developer] -->|push| AppRepo[Application repository]
-    AppRepo --> Pipeline[Azure DevOps pipeline]
-    Pipeline --> Tests[Tests and coverage]
-    Pipeline --> Security[SonarQube, Black Duck, Veracode]
-    Pipeline -->|build and push| ACR[Azure Container Registry]
-    Pipeline -->|commit image tag| GitOps[GitOps repository]
-    GitOps -->|continuous watch| ArgoCD[ArgoCD]
-    ArgoCD -->|reconcile desired state| AKS[Azure Kubernetes Service]
-    AKS -->|pull immutable image| ACR
+    subgraph Repositories
+        Services["Microservice repositories"]
+        Templates["Central pipeline templates"]
+        GitOps["GitOps repository<br/>Helm + environment values"]
+    end
+
+    Services --> Pipelines["Azure DevOps pipelines"]
+    Templates --> Pipelines
+    Pipelines --> Artifact["Pipeline artifact: drop"]
+    Pipelines --> Quality["SonarQube"]
+    Pipelines --> Security["Gitleaks / Black Duck / Veracode"]
+    Pipelines --> ACR["Azure Container Registry"]
+    Pipelines -->|"commit immutable image tag"| GitOps
+    GitOps --> ArgoCD["ArgoCD"]
+    ArgoCD -->|"Helm reconciliation"| AKS["Azure Kubernetes Service"]
+    AKS --> ACR
 ```
 
-The CI identity needs access to ACR and the GitOps repository, but not to the
-AKS API. ArgoCD is the only deployment actor.
+Azure DevOps never deploys directly to AKS. It publishes the image and updates
+desired state in Git. ArgoCD monitors Git and reconciles the Helm release.
+
+## Standard Pipeline
+
+The governed pipeline runs:
+
+1. Runtime setup for Python, Node.js, Java, or .NET.
+2. Gitleaks secret scan across Git history.
+3. SonarQube preparation.
+4. Service-specific build, tests, and coverage.
+5. SonarQube quality-gate enforcement.
+6. ZIP packaging and `drop` pipeline artifact publication.
+7. Black Duck software composition analysis.
+8. Veracode static application security testing.
+9. Immutable Docker image build and push to ACR.
+10. GitOps Helm values update.
+11. ArgoCD synchronization into AKS.
 
 ## Repository Layout
 
-This learning project keeps both logical repositories together for
-convenience:
-
 ```text
 .
-├── azure-pipelines.yml              # Application repository CI
-├── Dockerfile
-├── scripts/update-gitops-tag.sh
-├── src/                             # Python API
+├── azure-pipelines.yml
+├── pipelines/
+│   ├── templates/
+│   │   ├── enterprise-microservice.yml
+│   │   ├── stages/
+│   │   └── steps/
+│   └── examples/
+│       ├── python-service.yml
+│       ├── node-service.yml
+│       └── java-service.yml
+├── gitops/
+│   ├── argocd/
+│   ├── charts/gitops-calculator/
+│   └── environments/
+├── src/
 ├── tests/
-└── gitops/                          # Move to a separate repository
-    ├── argocd/
-    ├── charts/gitops-calculator/
-    └── environments/{dev,staging,prod}/values.yaml
+└── Dockerfile
 ```
 
-## Run Locally
+The repository contains the template implementation, three example consumer
+pipelines, a working Python microservice, and a representative GitOps
+repository.
 
-The service uses only the Python standard library.
+## Central Template Consumption
+
+Each microservice has a small `azure-pipelines.yml`:
+
+```yaml
+resources:
+  repositories:
+    - repository: centralTemplates
+      type: git
+      name: PlatformEngineering/central-pipeline-templates
+      ref: refs/tags/v1.0.0
+
+extends:
+  template: pipelines/templates/enterprise-microservice.yml@centralTemplates
+  parameters:
+    serviceName: payments-api
+    language: python
+    runtimeVersion: "3.12"
+    artifactPath: src
+    dockerfile: Dockerfile
+    imageRepository: payments-api
+    sonarProjectKey: payments-api
+    veracodeApplicationProfile: Payments API
+    gitopsValuesFile: apps/payments-api/environments/dev/values.yaml
+    buildSteps:
+      - bash: |
+          pip install -r requirements.txt
+          pytest --cov=src --cov-report=xml
+```
+
+See [pipelines/README.md](pipelines/README.md) for the complete parameter
+contract and language examples.
+
+## Azure DevOps Setup
+
+Create these repositories:
+
+- `central-pipeline-templates`
+- One repository per microservice
+- `platform-gitops`
+
+Create the `enterprise-cicd-secrets` variable group with:
+
+| Variable | Description |
+|---|---|
+| `acrServiceConnection` | ACR Docker service connection |
+| `sonarServiceConnection` | SonarQube service connection |
+| `veracodeServiceConnection` | Veracode Platform connection |
+| `blackDuckUrl` | Black Duck server |
+| `blackDuckToken` | Secret API token |
+| `gitOpsRepositoryUrl` | GitOps HTTPS clone URL |
+| `gitOpsPushToken` | Secret, narrowly scoped Git token |
+
+Detailed project creation, permissions, extensions, and governance are in
+[docs/azure-devops-project-setup.md](docs/azure-devops-project-setup.md).
+
+To bootstrap the Azure DevOps project and repositories:
+
+```bash
+./scripts/bootstrap-azure-devops.sh \
+  https://dev.azure.com/<organization> \
+  Enterprise-Microservices
+```
+
+## Local Application
 
 ```bash
 python3 -m unittest discover -s tests
 python3 -m src.app
 ```
 
-Try it:
-
 ```bash
 curl http://localhost:8080/health
 curl "http://localhost:8080/api/calculate?operation=divide&left=10&right=2"
 ```
 
-Or run it as a container:
+## GitOps and Helm
 
-```bash
-docker build -t gitops-calculator:local .
-docker run --rm -p 8080:8080 gitops-calculator:local
+The pipeline changes only the image tag in an environment values file.
+ArgoCD owns deployment:
+
+```text
+Azure DevOps -> ACR
+Azure DevOps -> GitOps commit
+ArgoCD -> Helm render -> AKS
+AKS -> ACR image pull
 ```
 
-## Create the Two Repositories
-
-1. Keep the application files in one Azure Repos repository.
-2. Create another repository for desired state, such as
-   `platform/gitops-calculator`.
-3. Copy the contents of `gitops/` to the root of that repository.
-4. Replace `REPLACE_ACR_LOGIN_SERVER` in all values files.
-5. Replace `REPLACE_GITOPS_REPOSITORY_URL` in the ArgoCD manifests.
-
-The pipeline expects environment values at
-`environments/<environment>/values.yaml` in the separate GitOps repository.
-
-## Azure DevOps Configuration
-
-Install the SonarQube and Veracode Azure DevOps extensions, then create:
-
-- An ACR Docker Registry service connection.
-- A SonarQube service connection.
-- A Veracode Platform service connection.
-- A secret variable group containing Black Duck and GitOps credentials.
-
-Define these pipeline variables:
-
-| Variable | Purpose |
-|---|---|
-| `acrServiceConnection` | Azure DevOps ACR service connection |
-| `sonarServiceConnection` | SonarQube service connection |
-| `veracodeServiceConnection` | Veracode Platform service connection |
-| `blackDuckUrl` | Black Duck server URL |
-| `blackDuckToken` | Secret Black Duck API token |
-| `gitOpsRepositoryUrl` | HTTPS clone URL of the GitOps repository |
-| `gitOpsPushToken` | Secret token with narrowly scoped Git push permission |
-
-Authorize the pipeline to use the service connections. Protect production by
-using a separate promotion pipeline or an Azure DevOps environment approval
-before selecting `prod`.
-
-## ACR and AKS
-
-Grant AKS pull access to ACR using managed identity:
-
-```bash
-az aks update \
-  --resource-group <resource-group> \
-  --name <aks-name> \
-  --attach-acr <acr-name>
-```
-
-Install ArgoCD in AKS using your organization’s approved release and
-high-availability settings. Register the private GitOps repository with
-ArgoCD, then apply:
-
-```bash
-kubectl apply -f gitops/argocd/project.yaml
-kubectl apply -f gitops/argocd/applications/dev.yaml
-kubectl apply -f gitops/argocd/applications/staging.yaml
-kubectl apply -f gitops/argocd/applications/prod.yaml
-```
-
-The applications use ArgoCD multi-source Helm values, so use a version of
-ArgoCD that supports the `$values` reference.
-
-## Deployment and Rollback
-
-On a successful `main` build:
-
-1. Azure DevOps pushes `gitops-calculator:<Build.BuildId>` to ACR.
-2. The pipeline updates one environment values file in the GitOps repository.
-3. ArgoCD detects the commit and reconciles the namespace in AKS.
-
-Rollback is a Git operation:
+Rollback uses Git:
 
 ```bash
 git revert <deployment-commit>
 git push origin main
 ```
 
-ArgoCD observes the revert and restores the prior image tag. The Git history
-remains the deployment audit trail.
+ArgoCD detects the revert and restores the prior immutable image.
 
-## Security Notes
+## Governance
 
-- Use immutable build IDs or image digests for releases; do not deploy
-  `latest`.
-- Protect both repositories with branch policies and required reviews.
-- Store all tokens in secret variables or an external secrets manager.
-- Give the pipeline no AKS credentials.
-- Use workload identity and managed identities where supported.
-- Restrict the GitOps push identity to the required repository and branch.
-- Require pull-request promotion for production in regulated environments.
+- Protect and version the central templates using release tags.
+- Require template approval for every consumer pipeline.
+- Keep service connections centrally managed.
+- Use branch policies and mandatory security gates.
+- Use environment approvals for production promotion.
+- Give CI ACR push and GitOps write access, but no AKS credentials.
+- Give AKS managed identity `AcrPull`.
+
+## Required Placeholder Changes
+
+Before deploying:
+
+- Replace `REPLACE_ACR_LOGIN_SERVER` in GitOps values.
+- Replace `REPLACE_GITOPS_REPOSITORY_URL` in ArgoCD applications.
+- Replace the example Azure Repos project/repository names.
+- Configure all service connections and variable-group values.

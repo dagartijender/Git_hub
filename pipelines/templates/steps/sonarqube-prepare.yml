@@ -1,0 +1,19 @@
+parameters:
+  - name: projectKey
+    type: string
+  - name: projectName
+    type: string
+
+steps:
+  - task: SonarQubePrepare@7
+    displayName: Prepare SonarQube analysis
+    inputs:
+      SonarQube: $(sonarServiceConnection)
+      scannerMode: CLI
+      configMode: manual
+      cliProjectKey: ${{ parameters.projectKey }}
+      cliProjectName: ${{ parameters.projectName }}
+      cliSources: .
+      extraProperties: |
+        sonar.python.coverage.reportPaths=coverage.xml
+        sonar.javascript.lcov.reportPaths=coverage/lcov.info

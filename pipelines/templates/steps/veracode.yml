@@ -1,0 +1,19 @@
+parameters:
+  - name: applicationProfile
+    type: string
+  - name: artifactPath
+    type: string
+
+steps:
+  - task: Veracode@3
+    displayName: Upload and scan with Veracode
+    inputs:
+      ConnectionDetailsSelection: "Service Connection"
+      AnalysisService: $(veracodeServiceConnection)
+      veracodeAppProfile: ${{ parameters.applicationProfile }}
+      version: $(Build.BuildNumber)
+      filepath: ${{ parameters.artifactPath }}
+      createProfile: true
+      importResults: true
+      failBuildOnPolicyFail: true
+      failBuildIfUploadAndScanBuildStepFails: true

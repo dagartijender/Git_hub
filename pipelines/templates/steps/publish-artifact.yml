@@ -1,0 +1,13 @@
+parameters:
+  - name: artifactName
+    type: string
+  - name: targetPath
+    type: string
+
+steps:
+  - task: PublishPipelineArtifact@1
+    displayName: Publish ${{ parameters.artifactName }} artifact
+    inputs:
+      targetPath: ${{ parameters.targetPath }}
+      artifact: ${{ parameters.artifactName }}
+      publishLocation: pipeline

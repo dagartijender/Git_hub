@@ -1,0 +1,55 @@
+parameters:
+  - name: serviceName
+    type: string
+  - name: imageTag
+    type: string
+  - name: gitopsBranch
+    type: string
+  - name: valuesFile
+    type: string
+
+steps:
+  - bash: |
+      set -euo pipefail
+      authenticated_url="${GITOPS_URL/https:\/\//https:\/\/build:${GITOPS_TOKEN}@}"
+      git clone --branch "${GITOPS_BRANCH}" --single-branch "${authenticated_url}" gitops-repository
+
+      python3 - "${VALUES_FILE}" "${IMAGE_TAG}" <<'PY'
+      import re
+      import sys
+      from pathlib import Path
+
+      path = Path("gitops-repository") / sys.argv[1]
+      image_tag = sys.argv[2]
+      content = path.read_text(encoding="utf-8")
+      updated, count = re.subn(
+          r"(?m)^(\s*tag:\s*)[^\s#]+(\s*(?:#.*)?)$",
+          lambda match: f'{match.group(1)}"{image_tag}"{match.group(2)}',
+          content,
+          count=1,
+      )
+      if count != 1:
+          raise SystemExit(f"Expected one image tag in {path}; found {count}")
+      path.write_text(updated, encoding="utf-8")
+      PY
+
+      cd gitops-repository
+      git config user.name "Azure DevOps"
+      git config user.email "azure-pipelines@local"
+      git add "${VALUES_FILE}"
+
+      if git diff --cached --quiet; then
+        echo "Desired state already uses ${IMAGE_TAG}"
+        exit 0
+      fi
+
+      git commit -m "deploy(${SERVICE_NAME}): image ${IMAGE_TAG}"
+      git push origin "HEAD:${GITOPS_BRANCH}"
+    displayName: Commit image tag to GitOps repository
+    env:
+      GITOPS_URL: $(gitOpsRepositoryUrl)
+      GITOPS_TOKEN: $(gitOpsPushToken)
+      GITOPS_BRANCH: ${{ parameters.gitopsBranch }}
+      VALUES_FILE: ${{ parameters.valuesFile }}
+      IMAGE_TAG: ${{ parameters.imageTag }}
+      SERVICE_NAME: ${{ parameters.serviceName }}

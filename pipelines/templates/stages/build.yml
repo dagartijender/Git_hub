@@ -1,0 +1,101 @@
+parameters:
+  - name: serviceName
+    type: string
+  - name: language
+    type: string
+  - name: runtimeVersion
+    type: string
+  - name: workingDirectory
+    type: string
+  - name: vmImage
+    type: string
+  - name: artifactPath
+    type: string
+  - name: artifactName
+    type: string
+  - name: sonarProjectKey
+    type: string
+  - name: enableSonarQube
+    type: boolean
+  - name: enableSecretScan
+    type: boolean
+  - name: preBuildSteps
+    type: stepList
+    default: []
+  - name: buildSteps
+    type: stepList
+    default: []
+  - name: postBuildSteps
+    type: stepList
+    default: []
+
+stages:
+  - stage: Build
+    displayName: Build, test, and publish
+    jobs:
+      - job: Build_${{ replace(parameters.serviceName, '-', '_') }}
+        displayName: Build ${{ parameters.serviceName }}
+        pool:
+          vmImage: ${{ parameters.vmImage }}
+        steps:
+          - checkout: self
+            clean: true
+            fetchDepth: 0
+
+          - ${{ if eq(parameters.language, 'python') }}:
+              - task: UsePythonVersion@0
+                inputs:
+                  versionSpec: ${{ parameters.runtimeVersion }}
+
+          - ${{ if eq(parameters.language, 'node') }}:
+              - task: NodeTool@0
+                inputs:
+                  versionSpec: ${{ parameters.runtimeVersion }}
+
+          - ${{ if eq(parameters.language, 'java') }}:
+              - task: JavaToolInstaller@0
+                inputs:
+                  versionSpec: ${{ parameters.runtimeVersion }}
+                  jdkArchitectureOption: x64
+                  jdkSourceOption: PreInstalled
+
+          - ${{ if eq(parameters.language, 'dotnet') }}:
+              - task: UseDotNet@2
+                inputs:
+                  packageType: sdk
+                  version: ${{ parameters.runtimeVersion }}
+
+          - ${{ if eq(parameters.enableSecretScan, true) }}:
+              - template: ../steps/secret-scan.yml
+
+          - ${{ if eq(parameters.enableSonarQube, true) }}:
+              - template: ../steps/sonarqube-prepare.yml
+                parameters:
+                  projectKey: ${{ parameters.sonarProjectKey }}
+                  projectName: ${{ parameters.serviceName }}
+
+          - ${{ each step in parameters.preBuildSteps }}:
+              - ${{ step }}
+
+          - ${{ each step in parameters.buildSteps }}:
+              - ${{ step }}
+
+          - ${{ each step in parameters.postBuildSteps }}:
+              - ${{ step }}
+
+          - ${{ if eq(parameters.enableSonarQube, true) }}:
+              - template: ../steps/sonarqube-complete.yml
+
+          - task: ArchiveFiles@2
+            displayName: Create application package
+            inputs:
+              rootFolderOrFile: $(Build.SourcesDirectory)/${{ parameters.artifactPath }}
+              includeRootFolder: false
+              archiveType: zip
+              archiveFile: $(Build.ArtifactStagingDirectory)/${{ parameters.serviceName }}-$(Build.BuildId).zip
+              replaceExistingArchive: true
+
+          - template: ../steps/publish-artifact.yml
+            parameters:
+              artifactName: ${{ parameters.artifactName }}
+              targetPath: $(Build.ArtifactStagingDirectory)

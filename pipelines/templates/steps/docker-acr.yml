@@ -1,0 +1,21 @@
+parameters:
+  - name: dockerfile
+    type: string
+  - name: buildContext
+    type: string
+  - name: repository
+    type: string
+  - name: imageTag
+    type: string
+
+steps:
+  - task: Docker@2
+    displayName: Build and push immutable image to ACR
+    inputs:
+      command: buildAndPush
+      containerRegistry: $(acrServiceConnection)
+      repository: ${{ parameters.repository }}
+      Dockerfile: ${{ parameters.dockerfile }}
+      buildContext: ${{ parameters.buildContext }}
+      tags: |
+        ${{ parameters.imageTag }}

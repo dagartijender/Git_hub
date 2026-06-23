@@ -1,0 +1,36 @@
+parameters:
+  - name: serviceName
+    type: string
+  - name: vmImage
+    type: string
+  - name: dockerfile
+    type: string
+  - name: dockerBuildContext
+    type: string
+  - name: imageRepository
+    type: string
+  - name: imageTag
+    type: string
+  - name: enabled
+    type: boolean
+
+stages:
+  - stage: Container
+    displayName: Build and publish container
+    dependsOn: Security
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: PushToACR
+        pool:
+          vmImage: ${{ parameters.vmImage }}
+        steps:
+          - checkout: self
+          - ${{ if eq(parameters.enabled, true) }}:
+              - template: ../steps/docker-acr.yml
+                parameters:
+                  dockerfile: ${{ parameters.dockerfile }}
+                  buildContext: ${{ parameters.dockerBuildContext }}
+                  repository: ${{ parameters.imageRepository }}
+                  imageTag: ${{ parameters.imageTag }}
+          - ${{ if eq(parameters.enabled, false) }}:
+              - bash: echo "Container publishing is disabled."

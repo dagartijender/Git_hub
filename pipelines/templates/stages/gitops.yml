@@ -1,0 +1,39 @@
+parameters:
+  - name: serviceName
+    type: string
+  - name: vmImage
+    type: string
+  - name: imageTag
+    type: string
+  - name: gitopsBranch
+    type: string
+  - name: gitopsValuesFile
+    type: string
+  - name: enabled
+    type: boolean
+
+stages:
+  - stage: GitOps
+    displayName: Promote desired state
+    dependsOn: Container
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: UpdateGitOps
+        displayName: Promote ${{ parameters.serviceName }}
+        environment: gitops-dev
+        pool:
+          vmImage: ${{ parameters.vmImage }}
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - ${{ if eq(parameters.enabled, true) }}:
+                    - template: ../steps/gitops-update.yml
+                      parameters:
+                        serviceName: ${{ parameters.serviceName }}
+                        imageTag: ${{ parameters.imageTag }}
+                        gitopsBranch: ${{ parameters.gitopsBranch }}
+                        valuesFile: ${{ parameters.gitopsValuesFile }}
+                - ${{ if eq(parameters.enabled, false) }}:
+                    - bash: echo "GitOps promotion is disabled."
