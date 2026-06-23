@@ -12,20 +12,22 @@ resources:
 
 variables:
   - group: enterprise-cicd-secrets
+  - name: imageTag
+    value: $(Build.BuildId)
 
 stages:
-  - template: pipelines/templates/enterprise-microservice.yml@centralTemplates
+  - template: pipelines/templates/stages/build.yml@centralTemplates
     parameters:
       serviceName: orders-api
       language: node
       runtimeVersion: "22.x"
       workingDirectory: .
+      vmImage: ubuntu-latest
       artifactPath: dist
-      dockerfile: Dockerfile
-      imageRepository: orders-api
+      artifactName: drop
       sonarProjectKey: orders-api
-      veracodeApplicationProfile: Orders API
-      gitopsValuesFile: apps/orders-api/environments/dev/values.yaml
+      enableSonarQube: true
+      enableSecretScan: true
       buildSteps:
         - bash: |
             npm ci
@@ -33,3 +35,32 @@ stages:
             npm test -- --coverage
             npm run build
           displayName: Test and build Node.js service
+
+  - template: pipelines/templates/stages/security.yml@centralTemplates
+    parameters:
+      serviceName: orders-api
+      vmImage: ubuntu-latest
+      workingDirectory: .
+      artifactName: drop
+      veracodeApplicationProfile: Orders API
+      enableBlackDuck: true
+      enableVeracode: true
+
+  - template: pipelines/templates/stages/container.yml@centralTemplates
+    parameters:
+      serviceName: orders-api
+      vmImage: ubuntu-latest
+      dockerfile: Dockerfile
+      dockerBuildContext: .
+      imageRepository: orders-api
+      imageTag: $(Build.BuildId)
+      enabled: true
+
+  - template: pipelines/templates/stages/gitops.yml@centralTemplates
+    parameters:
+      serviceName: orders-api
+      vmImage: ubuntu-latest
+      imageTag: $(Build.BuildId)
+      gitopsBranch: main
+      gitopsValuesFile: apps/orders-api/environments/dev/values.yaml
+      enabled: true

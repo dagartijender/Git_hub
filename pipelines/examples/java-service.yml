@@ -12,20 +12,22 @@ resources:
 
 variables:
   - group: enterprise-cicd-secrets
+  - name: imageTag
+    value: $(Build.BuildId)
 
 stages:
-  - template: pipelines/templates/enterprise-microservice.yml@centralTemplates
+  - template: pipelines/templates/stages/build.yml@centralTemplates
     parameters:
       serviceName: customer-api
       language: java
       runtimeVersion: "21"
       workingDirectory: .
+      vmImage: ubuntu-latest
       artifactPath: target
-      dockerfile: Dockerfile
-      imageRepository: customer-api
+      artifactName: drop
       sonarProjectKey: customer-api
-      veracodeApplicationProfile: Customer API
-      gitopsValuesFile: apps/customer-api/environments/dev/values.yaml
+      enableSonarQube: true
+      enableSecretScan: true
       buildSteps:
         - task: Maven@4
           displayName: Test and package Java service
@@ -34,3 +36,32 @@ stages:
             goals: clean verify
             publishJUnitResults: true
             testResultsFiles: "**/surefire-reports/TEST-*.xml"
+
+  - template: pipelines/templates/stages/security.yml@centralTemplates
+    parameters:
+      serviceName: customer-api
+      vmImage: ubuntu-latest
+      workingDirectory: .
+      artifactName: drop
+      veracodeApplicationProfile: Customer API
+      enableBlackDuck: true
+      enableVeracode: true
+
+  - template: pipelines/templates/stages/container.yml@centralTemplates
+    parameters:
+      serviceName: customer-api
+      vmImage: ubuntu-latest
+      dockerfile: Dockerfile
+      dockerBuildContext: .
+      imageRepository: customer-api
+      imageTag: $(Build.BuildId)
+      enabled: true
+
+  - template: pipelines/templates/stages/gitops.yml@centralTemplates
+    parameters:
+      serviceName: customer-api
+      vmImage: ubuntu-latest
+      imageTag: $(Build.BuildId)
+      gitopsBranch: main
+      gitopsValuesFile: apps/customer-api/environments/dev/values.yaml
+      enabled: true

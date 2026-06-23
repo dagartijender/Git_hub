@@ -1,46 +1,63 @@
 # Central Azure DevOps Pipeline Templates
 
-`enterprise-microservice.yml` is the shared stage template included by every
-microservice. It standardizes the stage order while allowing service teams to
-provide language-specific build steps.
+Each microservice pipeline includes the central stage templates directly. The
+pipeline remains easy to read while the implementation stays centrally
+governed.
+
+## Pipeline Structure
+
+```yaml
+variables:
+  - group: enterprise-cicd-secrets
+  - name: imageTag
+    value: $(Build.BuildId)
+
+stages:
+  - template: pipelines/templates/stages/build.yml@centralTemplates
+    parameters:
+      serviceName: payments-api
+      artifactName: drop
+      buildSteps: []
+
+  - template: pipelines/templates/stages/security.yml@centralTemplates
+    parameters:
+      serviceName: payments-api
+      artifactName: drop
+
+  - template: pipelines/templates/stages/container.yml@centralTemplates
+    parameters:
+      dockerfile: Dockerfile
+      imageRepository: payments-api
+      imageTag: $(Build.BuildId)
+
+  - template: pipelines/templates/stages/gitops.yml@centralTemplates
+    parameters:
+      imageTag: $(Build.BuildId)
+      gitopsValuesFile: apps/payments-api/environments/dev/values.yaml
+```
 
 ## Standard Lifecycle
 
-1. Select the required runtime.
-2. Scan the repository for secrets.
-3. Prepare SonarQube analysis.
-4. Run service-owned build and test steps.
-5. enforce the SonarQube quality gate.
-6. Package and publish the `drop` pipeline artifact.
-7. Run Black Duck and Veracode policy scans.
-8. Build and push an immutable image to ACR.
-9. Commit the image tag to the GitOps repository.
-10. Let ArgoCD reconcile the Helm release into AKS.
+1. Build and test the microservice.
+2. Run secret scanning and SonarQube.
+3. Package and publish the `drop` pipeline artifact.
+4. Run Black Duck and Veracode.
+5. Call the microservice's Dockerfile.
+6. Push the image tagged with `$(Build.BuildId)` to ACR.
+7. Commit the same build ID to the GitOps values file.
+8. Let ArgoCD deploy the Helm release to AKS.
 
-## Template Contract
+## Central Templates
 
-Important required parameters:
-
-| Parameter | Example |
+| Template | Responsibility |
 |---|---|
-| `serviceName` | `orders-api` |
-| `language` | `python`, `node`, `java`, or `dotnet` |
-| `runtimeVersion` | `3.12`, `22.x`, `21`, or `8.x` |
-| `artifactPath` | `dist`, `target`, or `src` |
-| `dockerfile` | `Dockerfile` |
-| `imageRepository` | `orders-api` |
-| `sonarProjectKey` | `orders-api` |
-| `veracodeApplicationProfile` | `Orders API` |
-| `gitopsValuesFile` | `apps/orders-api/environments/dev/values.yaml` |
-| `buildSteps` | A typed Azure Pipelines `stepList` |
-
-Optional security and delivery features are controlled by the `enable`
-object. They default to enabled.
+| `stages/build.yml` | Runtime, build, tests, SonarQube, secret scan, artifact |
+| `stages/security.yml` | Black Duck and Veracode |
+| `stages/container.yml` | Dockerfile build and ACR push |
+| `stages/gitops.yml` | Helm values image-tag update |
+| `steps/*.yml` | Reusable task-level implementation |
 
 ## External Repository Consumption
-
-Store these templates in a dedicated Azure Repos repository and pin consumers
-to a release tag:
 
 ```yaml
 resources:
@@ -49,14 +66,7 @@ resources:
       type: git
       name: PlatformEngineering/central-pipeline-templates
       ref: refs/tags/v1.0.0
-
-variables:
-  - group: enterprise-cicd-secrets
-
-stages:
-  - template: pipelines/templates/enterprise-microservice.yml@centralTemplates
 ```
 
-Use required-template approval and branch policies on the central repository.
-Release template changes through semantic Git tags so teams can upgrade in a
-controlled way.
+Pin production consumers to a version tag. Protect and review changes in the
+central template repository.

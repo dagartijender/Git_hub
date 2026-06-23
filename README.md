@@ -57,7 +57,6 @@ The governed pipeline runs:
 ├── azure-pipelines.yml
 ├── pipelines/
 │   ├── templates/
-│   │   ├── enterprise-microservice.yml
 │   │   ├── stages/
 │   │   └── steps/
 │   └── examples/
@@ -93,21 +92,32 @@ variables:
   - group: enterprise-cicd-secrets
 
 stages:
-  - template: pipelines/templates/enterprise-microservice.yml@centralTemplates
+  - template: pipelines/templates/stages/build.yml@centralTemplates
     parameters:
       serviceName: payments-api
       language: python
       runtimeVersion: "3.12"
+      workingDirectory: .
+      vmImage: ubuntu-latest
       artifactPath: src
-      dockerfile: Dockerfile
-      imageRepository: payments-api
+      artifactName: drop
       sonarProjectKey: payments-api
-      veracodeApplicationProfile: Payments API
-      gitopsValuesFile: apps/payments-api/environments/dev/values.yaml
+      enableSonarQube: true
+      enableSecretScan: true
       buildSteps:
         - bash: |
             pip install -r requirements.txt
             pytest --cov=src --cov-report=xml
+
+  - template: pipelines/templates/stages/container.yml@centralTemplates
+    parameters:
+      serviceName: payments-api
+      vmImage: ubuntu-latest
+      dockerfile: Dockerfile
+      dockerBuildContext: .
+      imageRepository: payments-api
+      imageTag: $(Build.BuildId)
+      enabled: true
 ```
 
 See [pipelines/README.md](pipelines/README.md) for the complete parameter

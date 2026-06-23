@@ -10,21 +10,23 @@ pr:
 
 variables:
   - group: enterprise-cicd-secrets
+  - name: imageTag
+    value: $(Build.BuildId)
 
-# This repository demonstrates stage-template inclusion by one microservice.
 stages:
-  - template: pipelines/templates/enterprise-microservice.yml
+  - template: pipelines/templates/stages/build.yml
     parameters:
       serviceName: calculator-api
       language: python
       runtimeVersion: "3.12"
       workingDirectory: .
+      vmImage: ubuntu-latest
       artifactPath: src
-      dockerfile: Dockerfile
-      imageRepository: gitops-calculator
+      artifactName: drop
       sonarProjectKey: calculator-api
-      veracodeApplicationProfile: calculator-api
-      gitopsValuesFile: environments/dev/values.yaml
+      enableSonarQube: true
+      enableSecretScan: true
+      preBuildSteps: []
       buildSteps:
         - bash: |
             python -m pip install --upgrade pip
@@ -33,10 +35,33 @@ stages:
             coverage xml
             coverage report --fail-under=80
           displayName: Test Python service
-      enable:
-        sonarQube: true
-        secretScan: true
-        blackDuck: true
-        veracode: true
-        container: true
-        gitOps: true
+      postBuildSteps: []
+
+  - template: pipelines/templates/stages/security.yml
+    parameters:
+      serviceName: calculator-api
+      vmImage: ubuntu-latest
+      workingDirectory: .
+      artifactName: drop
+      veracodeApplicationProfile: calculator-api
+      enableBlackDuck: true
+      enableVeracode: true
+
+  - template: pipelines/templates/stages/container.yml
+    parameters:
+      serviceName: calculator-api
+      vmImage: ubuntu-latest
+      dockerfile: Dockerfile
+      dockerBuildContext: .
+      imageRepository: gitops-calculator
+      imageTag: $(Build.BuildId)
+      enabled: true
+
+  - template: pipelines/templates/stages/gitops.yml
+    parameters:
+      serviceName: calculator-api
+      vmImage: ubuntu-latest
+      imageTag: $(Build.BuildId)
+      gitopsBranch: main
+      gitopsValuesFile: environments/dev/values.yaml
+      enabled: true
