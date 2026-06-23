@@ -89,22 +89,25 @@ resources:
       name: PlatformEngineering/central-pipeline-templates
       ref: refs/tags/v1.0.0
 
-extends:
-  template: pipelines/templates/enterprise-microservice.yml@centralTemplates
-  parameters:
-    serviceName: payments-api
-    language: python
-    runtimeVersion: "3.12"
-    artifactPath: src
-    dockerfile: Dockerfile
-    imageRepository: payments-api
-    sonarProjectKey: payments-api
-    veracodeApplicationProfile: Payments API
-    gitopsValuesFile: apps/payments-api/environments/dev/values.yaml
-    buildSteps:
-      - bash: |
-          pip install -r requirements.txt
-          pytest --cov=src --cov-report=xml
+variables:
+  - group: enterprise-cicd-secrets
+
+stages:
+  - template: pipelines/templates/enterprise-microservice.yml@centralTemplates
+    parameters:
+      serviceName: payments-api
+      language: python
+      runtimeVersion: "3.12"
+      artifactPath: src
+      dockerfile: Dockerfile
+      imageRepository: payments-api
+      sonarProjectKey: payments-api
+      veracodeApplicationProfile: Payments API
+      gitopsValuesFile: apps/payments-api/environments/dev/values.yaml
+      buildSteps:
+        - bash: |
+            pip install -r requirements.txt
+            pytest --cov=src --cov-report=xml
 ```
 
 See [pipelines/README.md](pipelines/README.md) for the complete parameter

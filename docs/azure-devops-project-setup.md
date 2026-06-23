@@ -76,8 +76,8 @@ Prefer Azure Key Vault-backed variable groups for tokens.
 ## Pipeline Creation
 
 Create one pipeline per microservice and select the service repository's
-`azure-pipelines.yml`. Each file imports the central repository and passes only
-service-specific parameters.
+`azure-pipelines.yml`. Each file imports the central repository, includes the
+shared stage template, and passes only service-specific parameters.
 
 Grant the pipeline's Build Service identity read access to
 `central-pipeline-templates`. Grant its GitOps identity contribute permission

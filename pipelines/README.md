@@ -1,6 +1,6 @@
 # Central Azure DevOps Pipeline Templates
 
-`enterprise-microservice.yml` is the governed entry point consumed by every
+`enterprise-microservice.yml` is the shared stage template included by every
 microservice. It standardizes the stage order while allowing service teams to
 provide language-specific build steps.
 
@@ -50,8 +50,11 @@ resources:
       name: PlatformEngineering/central-pipeline-templates
       ref: refs/tags/v1.0.0
 
-extends:
-  template: pipelines/templates/enterprise-microservice.yml@centralTemplates
+variables:
+  - group: enterprise-cicd-secrets
+
+stages:
+  - template: pipelines/templates/enterprise-microservice.yml@centralTemplates
 ```
 
 Use required-template approval and branch policies on the central repository.

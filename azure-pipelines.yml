@@ -8,32 +8,35 @@ pr:
     include:
       - main
 
-# This repository demonstrates both the central templates and one consumer.
-extends:
-  template: pipelines/templates/enterprise-microservice.yml
-  parameters:
-    serviceName: calculator-api
-    language: python
-    runtimeVersion: "3.12"
-    workingDirectory: .
-    artifactPath: src
-    dockerfile: Dockerfile
-    imageRepository: gitops-calculator
-    sonarProjectKey: calculator-api
-    veracodeApplicationProfile: calculator-api
-    gitopsValuesFile: environments/dev/values.yaml
-    buildSteps:
-      - bash: |
-          python -m pip install --upgrade pip
-          pip install coverage
-          coverage run -m unittest discover -s tests
-          coverage xml
-          coverage report --fail-under=80
-        displayName: Test Python service
-    enable:
-      sonarQube: true
-      secretScan: true
-      blackDuck: true
-      veracode: true
-      container: true
-      gitOps: true
+variables:
+  - group: enterprise-cicd-secrets
+
+# This repository demonstrates stage-template inclusion by one microservice.
+stages:
+  - template: pipelines/templates/enterprise-microservice.yml
+    parameters:
+      serviceName: calculator-api
+      language: python
+      runtimeVersion: "3.12"
+      workingDirectory: .
+      artifactPath: src
+      dockerfile: Dockerfile
+      imageRepository: gitops-calculator
+      sonarProjectKey: calculator-api
+      veracodeApplicationProfile: calculator-api
+      gitopsValuesFile: environments/dev/values.yaml
+      buildSteps:
+        - bash: |
+            python -m pip install --upgrade pip
+            pip install coverage
+            coverage run -m unittest discover -s tests
+            coverage xml
+            coverage report --fail-under=80
+          displayName: Test Python service
+      enable:
+        sonarQube: true
+        secretScan: true
+        blackDuck: true
+        veracode: true
+        container: true
+        gitOps: true

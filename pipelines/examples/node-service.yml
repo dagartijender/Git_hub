@@ -10,23 +10,26 @@ resources:
       name: PlatformEngineering/central-pipeline-templates
       ref: refs/tags/v1.0.0
 
-extends:
-  template: pipelines/templates/enterprise-microservice.yml@centralTemplates
-  parameters:
-    serviceName: orders-api
-    language: node
-    runtimeVersion: "22.x"
-    workingDirectory: .
-    artifactPath: dist
-    dockerfile: Dockerfile
-    imageRepository: orders-api
-    sonarProjectKey: orders-api
-    veracodeApplicationProfile: Orders API
-    gitopsValuesFile: apps/orders-api/environments/dev/values.yaml
-    buildSteps:
-      - bash: |
-          npm ci
-          npm run lint
-          npm test -- --coverage
-          npm run build
-        displayName: Test and build Node.js service
+variables:
+  - group: enterprise-cicd-secrets
+
+stages:
+  - template: pipelines/templates/enterprise-microservice.yml@centralTemplates
+    parameters:
+      serviceName: orders-api
+      language: node
+      runtimeVersion: "22.x"
+      workingDirectory: .
+      artifactPath: dist
+      dockerfile: Dockerfile
+      imageRepository: orders-api
+      sonarProjectKey: orders-api
+      veracodeApplicationProfile: Orders API
+      gitopsValuesFile: apps/orders-api/environments/dev/values.yaml
+      buildSteps:
+        - bash: |
+            npm ci
+            npm run lint
+            npm test -- --coverage
+            npm run build
+          displayName: Test and build Node.js service

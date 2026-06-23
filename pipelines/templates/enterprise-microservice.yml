@@ -59,13 +59,6 @@ parameters:
       container: true
       gitOps: true
 
-variables:
-  - group: enterprise-cicd-secrets
-  - name: serviceName
-    value: ${{ parameters.serviceName }}
-  - name: imageTag
-    value: ${{ parameters.imageTag }}
-
 stages:
   - template: stages/build.yml
     parameters:

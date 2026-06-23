@@ -10,24 +10,27 @@ resources:
       name: PlatformEngineering/central-pipeline-templates
       ref: refs/tags/v1.0.0
 
-extends:
-  template: pipelines/templates/enterprise-microservice.yml@centralTemplates
-  parameters:
-    serviceName: customer-api
-    language: java
-    runtimeVersion: "21"
-    workingDirectory: .
-    artifactPath: target
-    dockerfile: Dockerfile
-    imageRepository: customer-api
-    sonarProjectKey: customer-api
-    veracodeApplicationProfile: Customer API
-    gitopsValuesFile: apps/customer-api/environments/dev/values.yaml
-    buildSteps:
-      - task: Maven@4
-        displayName: Test and package Java service
-        inputs:
-          mavenPomFile: pom.xml
-          goals: clean verify
-          publishJUnitResults: true
-          testResultsFiles: "**/surefire-reports/TEST-*.xml"
+variables:
+  - group: enterprise-cicd-secrets
+
+stages:
+  - template: pipelines/templates/enterprise-microservice.yml@centralTemplates
+    parameters:
+      serviceName: customer-api
+      language: java
+      runtimeVersion: "21"
+      workingDirectory: .
+      artifactPath: target
+      dockerfile: Dockerfile
+      imageRepository: customer-api
+      sonarProjectKey: customer-api
+      veracodeApplicationProfile: Customer API
+      gitopsValuesFile: apps/customer-api/environments/dev/values.yaml
+      buildSteps:
+        - task: Maven@4
+          displayName: Test and package Java service
+          inputs:
+            mavenPomFile: pom.xml
+            goals: clean verify
+            publishJUnitResults: true
+            testResultsFiles: "**/surefire-reports/TEST-*.xml"
