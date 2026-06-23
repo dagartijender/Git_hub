@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: gitops-calculator
+  namespace: argocd
+spec:
+  description: GitOps Calculator environments
+  sourceRepos:
+    - REPLACE_GITOPS_REPOSITORY_URL
+  destinations:
+    - namespace: calculator-dev
+      server: https://kubernetes.default.svc
+    - namespace: calculator-staging
+      server: https://kubernetes.default.svc
+    - namespace: calculator-prod
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

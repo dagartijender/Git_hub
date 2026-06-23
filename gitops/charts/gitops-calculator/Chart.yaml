@@ -1,0 +1,6 @@
+apiVersion: v2
+name: gitops-calculator
+description: Helm chart for the GitOps calculator API
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

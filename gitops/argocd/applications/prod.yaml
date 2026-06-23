@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitops-calculator-prod
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: gitops-calculator
+  sources:
+    - repoURL: REPLACE_GITOPS_REPOSITORY_URL
+      targetRevision: main
+      path: charts/gitops-calculator
+      helm:
+        valueFiles:
+          - $values/environments/prod/values.yaml
+    - repoURL: REPLACE_GITOPS_REPOSITORY_URL
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: calculator-prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ServerSideApply=true

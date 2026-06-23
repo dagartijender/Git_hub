@@ -8,3 +8,7 @@ __pycache__/
 .venv/
 venv/
 
+# Test and analysis output
+.coverage
+coverage.xml
+.scannerwork/

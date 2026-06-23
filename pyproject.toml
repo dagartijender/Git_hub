@@ -1,0 +1,16 @@
+[project]
+name = "gitops-calculator"
+version = "1.0.0"
+description = "Minimal Python service used to demonstrate Azure DevOps and ArgoCD GitOps."
+requires-python = ">=3.12"
+
+[tool.coverage.run]
+source = ["src"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]

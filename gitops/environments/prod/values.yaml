@@ -1,0 +1,23 @@
+replicaCount: 3
+
+image:
+  repository: REPLACE_ACR_LOGIN_SERVER/gitops-calculator
+  tag: "1000"
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 65
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: calculator.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+env:
+  LOG_LEVEL: INFO

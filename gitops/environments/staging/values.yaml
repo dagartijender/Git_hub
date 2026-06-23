@@ -1,0 +1,14 @@
+replicaCount: 2
+
+image:
+  repository: REPLACE_ACR_LOGIN_SERVER/gitops-calculator
+  tag: "1000"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
+
+env:
+  LOG_LEVEL: INFO

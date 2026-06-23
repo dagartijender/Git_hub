@@ -1,0 +1,180 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pr:
+  branches:
+    include:
+      - main
+
+parameters:
+  - name: runBlackDuck
+    type: boolean
+    default: true
+  - name: runVeracode
+    type: boolean
+    default: true
+  - name: gitOpsEnvironment
+    type: string
+    default: dev
+    values:
+      - dev
+      - staging
+      - prod
+
+variables:
+  pythonVersion: "3.12"
+  imageRepository: "gitops-calculator"
+  imageTag: "$(Build.BuildId)"
+  dockerfilePath: "$(Build.SourcesDirectory)/Dockerfile"
+  # Configure these in an Azure DevOps variable group or pipeline UI:
+  # acrServiceConnection, sonarServiceConnection,
+  # gitOpsRepositoryUrl, gitOpsPushToken, blackDuckUrl, blackDuckToken,
+  # veracodeServiceConnection.
+
+stages:
+  - stage: Validate
+    displayName: Test and analyze
+    jobs:
+      - job: Test
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "$(pythonVersion)"
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install coverage
+            displayName: Install test tooling
+
+          - task: SonarQubePrepare@7
+            inputs:
+              SonarQube: "$(sonarServiceConnection)"
+              scannerMode: CLI
+              configMode: file
+
+          - script: |
+              coverage run -m unittest discover -s tests
+              coverage xml
+              coverage report --fail-under=80
+            displayName: Run unit tests and coverage
+
+          - task: SonarQubeAnalyze@7
+
+          - task: SonarQubePublish@7
+            inputs:
+              pollingTimeoutSec: "300"
+
+          - task: PublishCodeCoverageResults@2
+            inputs:
+              summaryFileLocation: "$(Build.SourcesDirectory)/coverage.xml"
+
+      - job: SoftwareCompositionAnalysis
+        displayName: Black Duck scan
+        condition: and(succeeded(), ${{ eq(parameters.runBlackDuck, true) }})
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+          - bash: |
+              bash <(curl -s -L https://detect.synopsys.com/detect10.sh) \
+                --blackduck.url="$(blackDuckUrl)" \
+                --blackduck.api.token="${BLACKDUCK_TOKEN}" \
+                --detect.project.name="$(Build.Repository.Name)" \
+                --detect.project.version.name="$(Build.SourceBranchName)-$(Build.BuildId)" \
+                --detect.policy.check.fail.on.severities=BLOCKER,CRITICAL
+            displayName: Run Black Duck Detect
+            env:
+              BLACKDUCK_TOKEN: "$(blackDuckToken)"
+
+      - job: StaticApplicationSecurityTest
+        displayName: Veracode scan
+        condition: and(succeeded(), ${{ eq(parameters.runVeracode, true) }})
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+          - task: ArchiveFiles@2
+            inputs:
+              rootFolderOrFile: "$(Build.SourcesDirectory)/src"
+              includeRootFolder: false
+              archiveType: zip
+              archiveFile: "$(Build.ArtifactStagingDirectory)/application.zip"
+          - task: Veracode@3
+            inputs:
+              ConnectionDetailsSelection: "Service Connection"
+              AnalysisService: "$(veracodeServiceConnection)"
+              veracodeAppProfile: "$(Build.Repository.Name)"
+              version: "$(Build.BuildNumber)"
+              filepath: "$(Build.ArtifactStagingDirectory)/application.zip"
+              createProfile: true
+              importResults: true
+              failBuildOnPolicyFail: true
+              failBuildIfUploadAndScanBuildStepFails: true
+
+  - stage: BuildAndPush
+    displayName: Build and push image
+    dependsOn: Validate
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: Container
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+          - task: Docker@2
+            displayName: Build and push to ACR
+            inputs:
+              command: buildAndPush
+              containerRegistry: "$(acrServiceConnection)"
+              repository: "$(imageRepository)"
+              Dockerfile: "$(dockerfilePath)"
+              buildContext: "$(Build.SourcesDirectory)"
+              tags: |
+                $(imageTag)
+                latest
+
+  - stage: UpdateGitOps
+    displayName: Update GitOps desired state
+    dependsOn: BuildAndPush
+    condition: succeeded()
+    jobs:
+      - job: CommitImageTag
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+          - bash: |
+              set -euo pipefail
+              authenticated_url="${GITOPS_URL/https:\/\//https:\/\/build:${GITOPS_TOKEN}@}"
+              git clone "${authenticated_url}" gitops-repository
+              cp "$(Build.SourcesDirectory)/scripts/update-gitops-tag.sh" /tmp/update-gitops-tag.sh
+              chmod +x /tmp/update-gitops-tag.sh
+              /tmp/update-gitops-tag.sh \
+                "environments/${GITOPS_ENV}/values.yaml" \
+                "$(imageTag)" \
+                gitops-repository
+
+              cd gitops-repository
+              git config user.name "Azure DevOps"
+              git config user.email "azure-pipelines@local"
+              git add "environments/${GITOPS_ENV}/values.yaml"
+
+              if git diff --cached --quiet; then
+                echo "GitOps repository already contains image tag $(imageTag)"
+                exit 0
+              fi
+
+              git commit -m "deploy(${GITOPS_ENV}): gitops-calculator $(imageTag)"
+              git push origin HEAD:main
+            displayName: Commit image tag to GitOps repository
+            env:
+              GITOPS_URL: "$(gitOpsRepositoryUrl)"
+              GITOPS_TOKEN: "$(gitOpsPushToken)"
+              GITOPS_ENV: "${{ parameters.gitOpsEnvironment }}"
