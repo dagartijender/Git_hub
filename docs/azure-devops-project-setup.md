@@ -7,6 +7,7 @@ Create one Azure DevOps project, for example `Enterprise-Microservices`, with:
 | Repository | Responsibility |
 |---|---|
 | `central-pipeline-templates` | Governed YAML templates |
+| `platform-infra` | Terraform for AKS, ACR, and Azure platform resources |
 | `payments-api` | Python microservice |
 | `orders-api` | Node.js microservice |
 | `customer-api` | Java microservice |
@@ -45,6 +46,7 @@ Create:
 
 | Name | Type | Scope |
 |---|---|---|
+| `sc-azure-terraform-enterprise` | Azure Resource Manager | Create and update Azure infrastructure |
 | `sc-acr-enterprise` | Docker Registry / ACR | Push images |
 | `sc-sonarqube-enterprise` | SonarQube | Analyze projects |
 | `sc-veracode-enterprise` | Veracode Platform | Upload and scan |
@@ -52,6 +54,7 @@ Create:
 Expose their names through the shared variable group:
 
 ```text
+azureServiceConnection=sc-azure-terraform-enterprise
 acrServiceConnection=sc-acr-enterprise
 sonarServiceConnection=sc-sonarqube-enterprise
 veracodeServiceConnection=sc-veracode-enterprise
@@ -73,6 +76,15 @@ Create `enterprise-cicd-secrets` and authorize it for approved pipelines:
 
 Prefer Azure Key Vault-backed variable groups for tokens.
 
+Create `enterprise-infra-secrets` for the Terraform pipeline:
+
+| Variable | Secret |
+|---|---|
+| `azureServiceConnection` | No |
+| `tfStateResourceGroup` | No |
+| `tfStateStorageAccount` | No |
+| `tfStateContainer` | No |
+
 If your organization uses self-hosted Azure DevOps agents, pass the pool into
 the central stages with `poolName` and optional `poolDemands`. Keep the agent
 pools prepared with Docker, Git, Bash, and the language runtimes required by
@@ -83,6 +95,16 @@ the microservice build.
 Create one pipeline per microservice and select the service repository's
 `azure-pipelines.yml`. Each file imports the central repository, includes the
 shared stage templates, and passes only service-specific parameters.
+
+Create one infrastructure pipeline from `azure-pipelines-infra.yml`. It imports
+the central Terraform stage templates:
+
+- `TerraformValidate`
+- `TerraformPlan`
+- `TerraformApply`
+
+Set approvals on Azure DevOps environments such as `infra-dev`,
+`infra-staging`, and `infra-prod` before allowing `apply`.
 
 Grant the pipeline's Build Service identity read access to
 `central-pipeline-templates`. Grant its GitOps identity contribute permission
@@ -110,6 +132,12 @@ flowchart LR
     Publish --> Scans["Security stage: Black Duck / Veracode"]
     Scans --> ACR["Push stage: ACR image"]
     ACR --> GitOps["GitOps repository tag update"]
+    InfraRepo["Terraform repository"] --> InfraPipeline["Infra pipeline"]
+    Templates --> InfraPipeline
+    InfraPipeline --> TFPlan["Terraform plan artifact"]
+    TFPlan --> TFApply["Approved Terraform apply"]
+    TFApply --> AKS
+    TFApply --> ACR
     GitOps --> ArgoCD["ArgoCD"]
     ArgoCD --> AKS["AKS Helm release"]
     AKS --> ACR

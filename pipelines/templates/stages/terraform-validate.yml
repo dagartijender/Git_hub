@@ -1,0 +1,55 @@
+parameters:
+  - name: serviceName
+    type: string
+    default: platform-infra
+  - name: azureServiceConnection
+    type: string
+  - name: workingDirectory
+    type: string
+  - name: vmImage
+    type: string
+    default: ubuntu-latest
+  - name: poolName
+    type: string
+    default: ""
+  - name: poolDemands
+    type: object
+    default: []
+
+stages:
+  - stage: TerraformValidate
+    displayName: Terraform validate
+    jobs:
+      - job: Validate_${{ replace(parameters.serviceName, '-', '_') }}
+        displayName: Validate Terraform
+        pool:
+          ${{ if ne(parameters.poolName, '') }}:
+            name: ${{ parameters.poolName }}
+            ${{ if gt(length(parameters.poolDemands), 0) }}:
+              demands:
+                ${{ each demand in parameters.poolDemands }}:
+                  - ${{ demand }}
+          ${{ if eq(parameters.poolName, '') }}:
+            vmImage: ${{ parameters.vmImage }}
+        steps:
+          - checkout: self
+            clean: true
+
+          - task: AzureCLI@2
+            displayName: Terraform fmt and validate
+            inputs:
+              azureSubscription: ${{ parameters.azureServiceConnection }}
+              scriptType: bash
+              scriptLocation: inlineScript
+              addSpnToEnvironment: true
+              inlineScript: |
+                set -euo pipefail
+                export ARM_CLIENT_ID="${servicePrincipalId}"
+                export ARM_CLIENT_SECRET="${servicePrincipalKey}"
+                export ARM_TENANT_ID="${tenantId}"
+                export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
+
+                terraform -chdir="${{ parameters.workingDirectory }}" fmt -check -recursive
+                terraform -chdir="${{ parameters.workingDirectory }}" init -backend=false
+                terraform -chdir="${{ parameters.workingDirectory }}" validate
+

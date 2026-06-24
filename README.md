@@ -16,6 +16,7 @@ flowchart LR
     subgraph Repositories
         Services["Microservice repositories"]
         Templates["Central pipeline templates"]
+        Infra["Terraform infrastructure"]
         GitOps["GitOps repository<br/>Helm + environment values"]
     end
 
@@ -26,6 +27,10 @@ flowchart LR
     Pipelines --> Security["Gitleaks / Black Duck / Veracode"]
     Pipelines --> ACR["Azure Container Registry"]
     Pipelines -->|"commit immutable image tag"| GitOps
+    Infra --> InfraPipeline["Terraform pipeline"]
+    Templates --> InfraPipeline
+    InfraPipeline -->|"plan/apply"| AKS
+    InfraPipeline -->|"provision"| ACR
     GitOps --> ArgoCD["ArgoCD"]
     ArgoCD -->|"Helm reconciliation"| AKS["Azure Kubernetes Service"]
     AKS --> ACR
@@ -50,11 +55,17 @@ The governed pipeline runs:
 10. GitOps Helm values update.
 11. ArgoCD synchronization into AKS.
 
+The infrastructure pipeline separately runs Terraform validate, plan, and
+approved apply for AKS, ACR, Log Analytics, and platform access.
+
 ## Repository Layout
 
 ```text
 .
 ├── azure-pipelines.yml
+├── azure-pipelines-infra.yml
+├── infra/
+│   └── terraform/
 ├── pipelines/
 │   ├── templates/
 │   │   ├── stages/
@@ -144,6 +155,7 @@ Create these repositories:
 
 - `central-pipeline-templates`
 - One repository per microservice
+- `platform-infra`
 - `platform-gitops`
 
 Create the `enterprise-cicd-secrets` variable group with:
@@ -157,6 +169,15 @@ Create the `enterprise-cicd-secrets` variable group with:
 | `blackDuckToken` | Secret API token |
 | `gitOpsRepositoryUrl` | GitOps HTTPS clone URL |
 | `gitOpsPushToken` | Secret, narrowly scoped Git token |
+
+Create the `enterprise-infra-secrets` variable group with:
+
+| Variable | Description |
+|---|---|
+| `azureServiceConnection` | Azure Resource Manager service connection |
+| `tfStateResourceGroup` | Terraform state resource group |
+| `tfStateStorageAccount` | Terraform state storage account |
+| `tfStateContainer` | Terraform state blob container |
 
 Detailed project creation, permissions, extensions, and governance are in
 [docs/azure-devops-project-setup.md](docs/azure-devops-project-setup.md).

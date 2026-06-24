@@ -43,6 +43,8 @@ stages:
 
 ## Standard Lifecycle
 
+### Application Delivery
+
 1. Build and test the microservice.
 2. Run secret scanning and SonarQube.
 3. Package and publish the `drop` pipeline artifact.
@@ -51,6 +53,14 @@ stages:
 6. Push the image tagged with `$(Build.BuildId)` to ACR.
 7. Commit the same build ID to the GitOps values file.
 8. Let ArgoCD deploy the Helm release to AKS.
+
+### Infrastructure Delivery
+
+1. Validate Terraform formatting and configuration.
+2. Initialize Terraform against the Azure Storage state backend.
+3. Create and publish a Terraform plan artifact.
+4. Apply the reviewed plan artifact from `main`.
+5. Protect higher environments with Azure DevOps environment approvals.
 
 ## Central Templates
 
@@ -61,6 +71,9 @@ stages:
 | `stages/security.yml` | Black Duck and Veracode |
 | `stages/container.yml` | Push stage for Dockerfile build and ACR push |
 | `stages/gitops.yml` | Helm values image-tag update |
+| `stages/terraform-validate.yml` | Terraform format and validate |
+| `stages/terraform-plan.yml` | Terraform init, plan, and plan artifact publish |
+| `stages/terraform-apply.yml` | Approved Terraform apply from published plan |
 | `steps/*.yml` | Reusable task-level implementation |
 
 ## External Repository Consumption

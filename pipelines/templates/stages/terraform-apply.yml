@@ -1,0 +1,85 @@
+parameters:
+  - name: serviceName
+    type: string
+    default: platform-infra
+  - name: azureServiceConnection
+    type: string
+  - name: workingDirectory
+    type: string
+  - name: environmentName
+    type: string
+  - name: backendResourceGroupName
+    type: string
+  - name: backendStorageAccountName
+    type: string
+  - name: backendContainerName
+    type: string
+  - name: backendStateKey
+    type: string
+  - name: enabled
+    type: boolean
+    default: true
+  - name: vmImage
+    type: string
+    default: ubuntu-latest
+  - name: poolName
+    type: string
+    default: ""
+  - name: poolDemands
+    type: object
+    default: []
+
+stages:
+  - stage: TerraformApply
+    displayName: Terraform apply
+    dependsOn: TerraformPlan
+    condition: and(succeeded(), ${{ parameters.enabled }}, eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: Apply_${{ replace(parameters.environmentName, '-', '_') }}
+        displayName: Apply ${{ parameters.environmentName }}
+        environment: infra-${{ parameters.environmentName }}
+        pool:
+          ${{ if ne(parameters.poolName, '') }}:
+            name: ${{ parameters.poolName }}
+            ${{ if gt(length(parameters.poolDemands), 0) }}:
+              demands:
+                ${{ each demand in parameters.poolDemands }}:
+                  - ${{ demand }}
+          ${{ if eq(parameters.poolName, '') }}:
+            vmImage: ${{ parameters.vmImage }}
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  clean: true
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: Download Terraform plan
+                  inputs:
+                    artifact: tfplan-${{ parameters.environmentName }}
+                    path: $(Pipeline.Workspace)/tfplan
+
+                - task: AzureCLI@2
+                  displayName: Terraform apply
+                  inputs:
+                    azureSubscription: ${{ parameters.azureServiceConnection }}
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    addSpnToEnvironment: true
+                    inlineScript: |
+                      set -euo pipefail
+                      export ARM_CLIENT_ID="${servicePrincipalId}"
+                      export ARM_CLIENT_SECRET="${servicePrincipalKey}"
+                      export ARM_TENANT_ID="${tenantId}"
+                      export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
+
+                      terraform -chdir="${{ parameters.workingDirectory }}" init \
+                        -backend-config="resource_group_name=${{ parameters.backendResourceGroupName }}" \
+                        -backend-config="storage_account_name=${{ parameters.backendStorageAccountName }}" \
+                        -backend-config="container_name=${{ parameters.backendContainerName }}" \
+                        -backend-config="key=${{ parameters.backendStateKey }}"
+
+                      terraform -chdir="${{ parameters.workingDirectory }}" apply \
+                        -auto-approve \
+                        "$(Pipeline.Workspace)/tfplan/${{ parameters.environmentName }}.tfplan"

@@ -41,6 +41,7 @@ fi
 
 repositories=(
   central-pipeline-templates
+  platform-infra
   payments-api
   orders-api
   customer-api
@@ -65,4 +66,4 @@ done
 
 echo
 echo "Azure DevOps project is ready: ${project_name}"
-echo "Next: create service connections and the enterprise-cicd-secrets variable group."
+echo "Next: create service connections and the enterprise-cicd-secrets / enterprise-infra-secrets variable groups."
