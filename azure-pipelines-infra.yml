@@ -6,6 +6,7 @@ trigger:
     include:
       - infra/terraform/**
       - pipelines/templates/stages/terraform-*.yml
+      - pipelines/templates/stages/approval.yml
       - azure-pipelines-infra.yml
 
 pr:
@@ -16,6 +17,7 @@ pr:
     include:
       - infra/terraform/**
       - pipelines/templates/stages/terraform-*.yml
+      - pipelines/templates/stages/approval.yml
       - azure-pipelines-infra.yml
 
 variables:
@@ -28,6 +30,10 @@ variables:
     value: environments/dev.tfvars
   - name: terraformStateKey
     value: gitops-platform/dev.tfstate
+  - name: approvalNotifyUsers
+    value: ""
+  - name: approvalApprovers
+    value: ""
 
 stages:
   - template: pipelines/templates/stages/terraform-validate.yml
@@ -50,6 +56,18 @@ stages:
       backendStateKey: $(terraformStateKey)
       vmImage: ubuntu-latest
 
+  - template: pipelines/templates/stages/approval.yml
+    parameters:
+      stageName: TerraformApproval
+      displayName: Approve Terraform apply
+      dependsOn:
+        - TerraformPlan
+      instructions: Review the Terraform plan artifact for $(environmentName), then approve to apply the exact plan.
+      notifyUsers: $(approvalNotifyUsers)
+      approvers: $(approvalApprovers)
+      timeoutInMinutes: 1440
+      enabled: true
+
   - template: pipelines/templates/stages/terraform-apply.yml
     parameters:
       serviceName: platform-infra
@@ -62,4 +80,3 @@ stages:
       backendStateKey: $(terraformStateKey)
       enabled: true
       vmImage: ubuntu-latest
-

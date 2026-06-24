@@ -84,6 +84,8 @@ Create `enterprise-infra-secrets` for the Terraform pipeline:
 | `tfStateResourceGroup` | No |
 | `tfStateStorageAccount` | No |
 | `tfStateContainer` | No |
+| `approvalNotifyUsers` | No |
+| `approvalApprovers` | No |
 
 If your organization uses self-hosted Azure DevOps agents, pass the pool into
 the central stages with `poolName` and optional `poolDemands`. Keep the agent
@@ -101,10 +103,13 @@ the central Terraform stage templates:
 
 - `TerraformValidate`
 - `TerraformPlan`
+- `TerraformApproval`
 - `TerraformApply`
 
-Set approvals on Azure DevOps environments such as `infra-dev`,
-`infra-staging`, and `infra-prod` before allowing `apply`.
+The `TerraformApproval` stage uses Azure DevOps `ManualValidation` so the plan
+artifact is reviewed before apply. Also set approvals on Azure DevOps
+environments such as `infra-dev`, `infra-staging`, and `infra-prod` for a
+second control layer.
 
 Grant the pipeline's Build Service identity read access to
 `central-pipeline-templates`. Grant its GitOps identity contribute permission
@@ -135,7 +140,8 @@ flowchart LR
     InfraRepo["Terraform repository"] --> InfraPipeline["Infra pipeline"]
     Templates --> InfraPipeline
     InfraPipeline --> TFPlan["Terraform plan artifact"]
-    TFPlan --> TFApply["Approved Terraform apply"]
+    TFPlan --> Approval["Manual approval"]
+    Approval --> TFApply["Approved Terraform apply"]
     TFApply --> AKS
     TFApply --> ACR
     GitOps --> ArgoCD["ArgoCD"]

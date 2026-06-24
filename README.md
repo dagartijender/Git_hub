@@ -55,8 +55,8 @@ The governed pipeline runs:
 10. GitOps Helm values update.
 11. ArgoCD synchronization into AKS.
 
-The infrastructure pipeline separately runs Terraform validate, plan, and
-approved apply for AKS, ACR, Log Analytics, and platform access.
+The infrastructure pipeline separately runs Terraform validate, plan, manual
+approval, and approved apply for AKS, ACR, Log Analytics, and platform access.
 
 ## Repository Layout
 
@@ -178,6 +178,8 @@ Create the `enterprise-infra-secrets` variable group with:
 | `tfStateResourceGroup` | Terraform state resource group |
 | `tfStateStorageAccount` | Terraform state storage account |
 | `tfStateContainer` | Terraform state blob container |
+| `approvalNotifyUsers` | Optional users or groups notified for manual approvals |
+| `approvalApprovers` | Optional users or groups allowed to approve |
 
 Detailed project creation, permissions, extensions, and governance are in
 [docs/azure-devops-project-setup.md](docs/azure-devops-project-setup.md).

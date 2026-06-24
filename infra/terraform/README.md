@@ -19,6 +19,8 @@ tfStateResourceGroup=<state-resource-group>
 tfStateStorageAccount=<state-storage-account>
 tfStateContainer=tfstate
 azureServiceConnection=sc-azure-terraform-enterprise
+approvalNotifyUsers=<optional-reviewer-email-or-group>
+approvalApprovers=<optional-approver-email-or-group>
 ```
 
 Each environment uses a separate state key:
@@ -41,6 +43,6 @@ terraform init \
 terraform plan -var-file=environments/dev.tfvars
 ```
 
-Production changes should go through pull request review and Azure DevOps
-environment approval before `apply`.
-
+Production changes should go through pull request review, the pipeline
+`TerraformApproval` manual validation stage, and Azure DevOps environment
+approval before `apply`.

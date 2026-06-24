@@ -16,6 +16,10 @@ parameters:
     type: string
   - name: backendStateKey
     type: string
+  - name: dependsOn
+    type: object
+    default:
+      - TerraformApproval
   - name: enabled
     type: boolean
     default: true
@@ -32,7 +36,7 @@ parameters:
 stages:
   - stage: TerraformApply
     displayName: Terraform apply
-    dependsOn: TerraformPlan
+    dependsOn: ${{ parameters.dependsOn }}
     condition: and(succeeded(), ${{ parameters.enabled }}, eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
       - deployment: Apply_${{ replace(parameters.environmentName, '-', '_') }}

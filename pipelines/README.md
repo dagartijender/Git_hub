@@ -59,8 +59,9 @@ stages:
 1. Validate Terraform formatting and configuration.
 2. Initialize Terraform against the Azure Storage state backend.
 3. Create and publish a Terraform plan artifact.
-4. Apply the reviewed plan artifact from `main`.
-5. Protect higher environments with Azure DevOps environment approvals.
+4. Pause for manual approval after the plan is published.
+5. Apply the reviewed plan artifact from `main`.
+6. Protect higher environments with Azure DevOps environment approvals.
 
 ## Central Templates
 
@@ -71,6 +72,7 @@ stages:
 | `stages/security.yml` | Black Duck and Veracode |
 | `stages/container.yml` | Push stage for Dockerfile build and ACR push |
 | `stages/gitops.yml` | Helm values image-tag update |
+| `stages/approval.yml` | Reusable manual approval gate |
 | `stages/terraform-validate.yml` | Terraform format and validate |
 | `stages/terraform-plan.yml` | Terraform init, plan, and plan artifact publish |
 | `stages/terraform-apply.yml` | Approved Terraform apply from published plan |
