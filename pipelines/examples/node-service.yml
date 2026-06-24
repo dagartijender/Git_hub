@@ -23,8 +23,6 @@ stages:
       runtimeVersion: "22.x"
       workingDirectory: .
       vmImage: ubuntu-latest
-      artifactPath: dist
-      artifactName: drop
       sonarProjectKey: orders-api
       enableSonarQube: true
       enableSecretScan: true
@@ -35,6 +33,13 @@ stages:
             npm test -- --coverage
             npm run build
           displayName: Test and build Node.js service
+
+  - template: pipelines/templates/stages/publish.yml@centralTemplates
+    parameters:
+      serviceName: orders-api
+      vmImage: ubuntu-latest
+      artifactPath: dist
+      artifactName: drop
 
   - template: pipelines/templates/stages/security.yml@centralTemplates
     parameters:

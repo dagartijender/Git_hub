@@ -9,10 +9,12 @@ parameters:
     type: string
   - name: vmImage
     type: string
-  - name: artifactPath
+  - name: poolName
     type: string
-  - name: artifactName
-    type: string
+    default: ""
+  - name: poolDemands
+    type: object
+    default: []
   - name: sonarProjectKey
     type: string
   - name: enableSonarQube
@@ -31,12 +33,19 @@ parameters:
 
 stages:
   - stage: Build
-    displayName: Build, test, and publish
+    displayName: Build and test
     jobs:
       - job: Build_${{ replace(parameters.serviceName, '-', '_') }}
         displayName: Build ${{ parameters.serviceName }}
         pool:
-          vmImage: ${{ parameters.vmImage }}
+          ${{ if ne(parameters.poolName, '') }}:
+            name: ${{ parameters.poolName }}
+            ${{ if gt(length(parameters.poolDemands), 0) }}:
+              demands:
+                ${{ each demand in parameters.poolDemands }}:
+                  - ${{ demand }}
+          ${{ if eq(parameters.poolName, '') }}:
+            vmImage: ${{ parameters.vmImage }}
         steps:
           - checkout: self
             clean: true
@@ -85,17 +94,3 @@ stages:
 
           - ${{ if eq(parameters.enableSonarQube, true) }}:
               - template: ../steps/sonarqube-complete.yml
-
-          - task: ArchiveFiles@2
-            displayName: Create application package
-            inputs:
-              rootFolderOrFile: $(Build.SourcesDirectory)/${{ parameters.artifactPath }}
-              includeRootFolder: false
-              archiveType: zip
-              archiveFile: $(Build.ArtifactStagingDirectory)/${{ parameters.serviceName }}-$(Build.BuildId).zip
-              replaceExistingArchive: true
-
-          - template: ../steps/publish-artifact.yml
-            parameters:
-              artifactName: ${{ parameters.artifactName }}
-              targetPath: $(Build.ArtifactStagingDirectory)

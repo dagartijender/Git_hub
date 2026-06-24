@@ -3,6 +3,12 @@ parameters:
     type: string
   - name: vmImage
     type: string
+  - name: poolName
+    type: string
+    default: ""
+  - name: poolDemands
+    type: object
+    default: []
   - name: workingDirectory
     type: string
   - name: artifactName
@@ -17,13 +23,20 @@ parameters:
 stages:
   - stage: Security
     displayName: Enterprise security gates
-    dependsOn: Build
+    dependsOn: Publish
     condition: succeeded()
     jobs:
       - ${{ if eq(parameters.enableBlackDuck, true) }}:
           - job: BlackDuck
             pool:
-              vmImage: ${{ parameters.vmImage }}
+              ${{ if ne(parameters.poolName, '') }}:
+                name: ${{ parameters.poolName }}
+                ${{ if gt(length(parameters.poolDemands), 0) }}:
+                  demands:
+                    ${{ each demand in parameters.poolDemands }}:
+                      - ${{ demand }}
+              ${{ if eq(parameters.poolName, '') }}:
+                vmImage: ${{ parameters.vmImage }}
             steps:
               - checkout: self
               - template: ../steps/blackduck.yml
@@ -34,7 +47,14 @@ stages:
       - ${{ if eq(parameters.enableVeracode, true) }}:
           - job: Veracode
             pool:
-              vmImage: ${{ parameters.vmImage }}
+              ${{ if ne(parameters.poolName, '') }}:
+                name: ${{ parameters.poolName }}
+                ${{ if gt(length(parameters.poolDemands), 0) }}:
+                  demands:
+                    ${{ each demand in parameters.poolDemands }}:
+                      - ${{ demand }}
+              ${{ if eq(parameters.poolName, '') }}:
+                vmImage: ${{ parameters.vmImage }}
             steps:
               - checkout: none
               - task: DownloadPipelineArtifact@2

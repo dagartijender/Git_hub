@@ -16,8 +16,13 @@ stages:
   - template: pipelines/templates/stages/build.yml@centralTemplates
     parameters:
       serviceName: payments-api
-      artifactName: drop
       buildSteps: []
+
+  - template: pipelines/templates/stages/publish.yml@centralTemplates
+    parameters:
+      serviceName: payments-api
+      artifactPath: src
+      artifactName: drop
 
   - template: pipelines/templates/stages/security.yml@centralTemplates
     parameters:
@@ -51,9 +56,10 @@ stages:
 
 | Template | Responsibility |
 |---|---|
-| `stages/build.yml` | Runtime, build, tests, SonarQube, secret scan, artifact |
+| `stages/build.yml` | Runtime, build, tests, SonarQube, secret scan |
+| `stages/publish.yml` | Package and publish the `drop` pipeline artifact |
 | `stages/security.yml` | Black Duck and Veracode |
-| `stages/container.yml` | Dockerfile build and ACR push |
+| `stages/container.yml` | Push stage for Dockerfile build and ACR push |
 | `stages/gitops.yml` | Helm values image-tag update |
 | `steps/*.yml` | Reusable task-level implementation |
 

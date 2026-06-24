@@ -3,6 +3,12 @@ parameters:
     type: string
   - name: vmImage
     type: string
+  - name: poolName
+    type: string
+    default: ""
+  - name: poolDemands
+    type: object
+    default: []
   - name: dockerfile
     type: string
   - name: dockerBuildContext
@@ -15,14 +21,21 @@ parameters:
     type: boolean
 
 stages:
-  - stage: Container
-    displayName: Build and publish container
+  - stage: Push
+    displayName: Push image to ACR
     dependsOn: Security
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
       - job: PushToACR
         pool:
-          vmImage: ${{ parameters.vmImage }}
+          ${{ if ne(parameters.poolName, '') }}:
+            name: ${{ parameters.poolName }}
+            ${{ if gt(length(parameters.poolDemands), 0) }}:
+              demands:
+                ${{ each demand in parameters.poolDemands }}:
+                  - ${{ demand }}
+          ${{ if eq(parameters.poolName, '') }}:
+            vmImage: ${{ parameters.vmImage }}
         steps:
           - checkout: self
           - ${{ if eq(parameters.enabled, true) }}:

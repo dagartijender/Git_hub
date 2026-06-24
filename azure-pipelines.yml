@@ -21,8 +21,6 @@ stages:
       runtimeVersion: "3.12"
       workingDirectory: .
       vmImage: ubuntu-latest
-      artifactPath: src
-      artifactName: drop
       sonarProjectKey: calculator-api
       enableSonarQube: true
       enableSecretScan: true
@@ -36,6 +34,13 @@ stages:
             coverage report --fail-under=80
           displayName: Test Python service
       postBuildSteps: []
+
+  - template: pipelines/templates/stages/publish.yml
+    parameters:
+      serviceName: calculator-api
+      vmImage: ubuntu-latest
+      artifactPath: src
+      artifactName: drop
 
   - template: pipelines/templates/stages/security.yml
     parameters:

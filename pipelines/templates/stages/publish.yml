@@ -1,0 +1,54 @@
+parameters:
+  - name: serviceName
+    type: string
+  - name: vmImage
+    type: string
+  - name: poolName
+    type: string
+    default: ""
+  - name: poolDemands
+    type: object
+    default: []
+  - name: artifactPath
+    type: string
+  - name: artifactName
+    type: string
+  - name: dependsOn
+    type: object
+    default:
+      - Build
+
+stages:
+  - stage: Publish
+    displayName: Publish build artifact
+    dependsOn: ${{ parameters.dependsOn }}
+    condition: succeeded()
+    jobs:
+      - job: Publish_${{ replace(parameters.serviceName, '-', '_') }}
+        displayName: Publish ${{ parameters.artifactName }} artifact
+        pool:
+          ${{ if ne(parameters.poolName, '') }}:
+            name: ${{ parameters.poolName }}
+            ${{ if gt(length(parameters.poolDemands), 0) }}:
+              demands:
+                ${{ each demand in parameters.poolDemands }}:
+                  - ${{ demand }}
+          ${{ if eq(parameters.poolName, '') }}:
+            vmImage: ${{ parameters.vmImage }}
+        steps:
+          - checkout: self
+            clean: true
+
+          - task: ArchiveFiles@2
+            displayName: Create application package
+            inputs:
+              rootFolderOrFile: $(Build.SourcesDirectory)/${{ parameters.artifactPath }}
+              includeRootFolder: false
+              archiveType: zip
+              archiveFile: $(Build.ArtifactStagingDirectory)/${{ parameters.serviceName }}-$(Build.BuildId).zip
+              replaceExistingArchive: true
+
+          - template: ../steps/publish-artifact.yml
+            parameters:
+              artifactName: ${{ parameters.artifactName }}
+              targetPath: $(Build.ArtifactStagingDirectory)

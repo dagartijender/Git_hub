@@ -73,11 +73,16 @@ Create `enterprise-cicd-secrets` and authorize it for approved pipelines:
 
 Prefer Azure Key Vault-backed variable groups for tokens.
 
+If your organization uses self-hosted Azure DevOps agents, pass the pool into
+the central stages with `poolName` and optional `poolDemands`. Keep the agent
+pools prepared with Docker, Git, Bash, and the language runtimes required by
+the microservice build.
+
 ## Pipeline Creation
 
 Create one pipeline per microservice and select the service repository's
 `azure-pipelines.yml`. Each file imports the central repository, includes the
-shared stage template, and passes only service-specific parameters.
+shared stage templates, and passes only service-specific parameters.
 
 Grant the pipeline's Build Service identity read access to
 `central-pipeline-templates`. Grant its GitOps identity contribute permission
@@ -100,10 +105,11 @@ only to `platform-gitops`.
 flowchart LR
     ServiceRepo["Microservice repository"] --> Pipeline["Thin service pipeline"]
     Templates["Central template repository"] --> Pipeline
-    Pipeline --> Artifact["Pipeline artifact: drop"]
-    Pipeline --> Scans["SonarQube / Secret / Black Duck / Veracode"]
-    Pipeline --> ACR["Azure Container Registry"]
-    Pipeline --> GitOps["GitOps repository tag update"]
+    Pipeline --> Build["Build stage: tests, SonarQube, secret scan"]
+    Build --> Publish["Publish stage: drop artifact"]
+    Publish --> Scans["Security stage: Black Duck / Veracode"]
+    Scans --> ACR["Push stage: ACR image"]
+    ACR --> GitOps["GitOps repository tag update"]
     GitOps --> ArgoCD["ArgoCD"]
     ArgoCD --> AKS["AKS Helm release"]
     AKS --> ACR

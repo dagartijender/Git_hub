@@ -99,8 +99,6 @@ stages:
       runtimeVersion: "3.12"
       workingDirectory: .
       vmImage: ubuntu-latest
-      artifactPath: src
-      artifactName: drop
       sonarProjectKey: payments-api
       enableSonarQube: true
       enableSecretScan: true
@@ -108,6 +106,20 @@ stages:
         - bash: |
             pip install -r requirements.txt
             pytest --cov=src --cov-report=xml
+
+  - template: pipelines/templates/stages/publish.yml@centralTemplates
+    parameters:
+      serviceName: payments-api
+      vmImage: ubuntu-latest
+      artifactPath: src
+      artifactName: drop
+
+  - template: pipelines/templates/stages/security.yml@centralTemplates
+    parameters:
+      serviceName: payments-api
+      vmImage: ubuntu-latest
+      workingDirectory: .
+      artifactName: drop
 
   - template: pipelines/templates/stages/container.yml@centralTemplates
     parameters:
@@ -119,6 +131,9 @@ stages:
       imageTag: $(Build.BuildId)
       enabled: true
 ```
+
+The central stages also accept `poolName` and `poolDemands` when a service
+must run on a self-hosted Azure DevOps agent pool instead of `vmImage`.
 
 See [pipelines/README.md](pipelines/README.md) for the complete parameter
 contract and language examples.

@@ -3,6 +3,12 @@ parameters:
     type: string
   - name: vmImage
     type: string
+  - name: poolName
+    type: string
+    default: ""
+  - name: poolDemands
+    type: object
+    default: []
   - name: imageTag
     type: string
   - name: gitopsBranch
@@ -15,14 +21,21 @@ parameters:
 stages:
   - stage: GitOps
     displayName: Promote desired state
-    dependsOn: Container
+    dependsOn: Push
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
       - deployment: UpdateGitOps
         displayName: Promote ${{ parameters.serviceName }}
         environment: gitops-dev
         pool:
-          vmImage: ${{ parameters.vmImage }}
+          ${{ if ne(parameters.poolName, '') }}:
+            name: ${{ parameters.poolName }}
+            ${{ if gt(length(parameters.poolDemands), 0) }}:
+              demands:
+                ${{ each demand in parameters.poolDemands }}:
+                  - ${{ demand }}
+          ${{ if eq(parameters.poolName, '') }}:
+            vmImage: ${{ parameters.vmImage }}
         strategy:
           runOnce:
             deploy:

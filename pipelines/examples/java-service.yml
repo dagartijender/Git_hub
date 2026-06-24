@@ -23,8 +23,6 @@ stages:
       runtimeVersion: "21"
       workingDirectory: .
       vmImage: ubuntu-latest
-      artifactPath: target
-      artifactName: drop
       sonarProjectKey: customer-api
       enableSonarQube: true
       enableSecretScan: true
@@ -36,6 +34,13 @@ stages:
             goals: clean verify
             publishJUnitResults: true
             testResultsFiles: "**/surefire-reports/TEST-*.xml"
+
+  - template: pipelines/templates/stages/publish.yml@centralTemplates
+    parameters:
+      serviceName: customer-api
+      vmImage: ubuntu-latest
+      artifactPath: target
+      artifactName: drop
 
   - template: pipelines/templates/stages/security.yml@centralTemplates
     parameters:
