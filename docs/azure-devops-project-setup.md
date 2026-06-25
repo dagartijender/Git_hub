@@ -8,6 +8,7 @@ Create one Azure DevOps project, for example `Enterprise-Microservices`, with:
 |---|---|
 | `central-pipeline-templates` | Governed YAML templates |
 | `platform-infra` | Terraform for AKS, ACR, and Azure platform resources |
+| `ai-devops-assistant` | AI-assisted DevOps log triage and recommendation service |
 | `payments-api` | Python microservice |
 | `orders-api` | Node.js microservice |
 | `customer-api` | Java microservice |

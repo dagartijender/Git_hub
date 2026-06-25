@@ -9,6 +9,10 @@ central templates enforce build, artifact publication, SonarQube, secret
 scanning, Black Duck, Veracode, container publishing to ACR, and GitOps
 promotion.
 
+It also includes an AI DevOps Assistant project that analyzes failed pipeline
+logs, classifies common delivery failures, and recommends owner-specific next
+actions.
+
 ## Architecture
 
 ```mermaid
@@ -63,7 +67,10 @@ approval, and approved apply for AKS, ACR, Log Analytics, and platform access.
 ```text
 .
 ├── azure-pipelines.yml
+├── azure-pipelines-ai-devops.yml
 ├── azure-pipelines-infra.yml
+├── ai-devops/
+├── ai_devops_assistant/
 ├── infra/
 │   └── terraform/
 ├── pipelines/
@@ -84,8 +91,8 @@ approval, and approved apply for AKS, ACR, Log Analytics, and platform access.
 ```
 
 The repository contains the template implementation, three example consumer
-pipelines, a working Python microservice, and a representative GitOps
-repository.
+pipelines, a working Python microservice, an AI DevOps Assistant, Terraform
+infrastructure, and a representative GitOps repository.
 
 ## Central Template Consumption
 
@@ -155,6 +162,7 @@ Create these repositories:
 
 - `central-pipeline-templates`
 - One repository per microservice
+- `ai-devops-assistant`
 - `platform-infra`
 - `platform-gitops`
 

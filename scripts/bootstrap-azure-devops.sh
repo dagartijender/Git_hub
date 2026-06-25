@@ -42,6 +42,7 @@ fi
 repositories=(
   central-pipeline-templates
   platform-infra
+  ai-devops-assistant
   payments-api
   orders-api
   customer-api

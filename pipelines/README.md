@@ -91,3 +91,15 @@ resources:
 
 Pin production consumers to a version tag. Protect and review changes in the
 central template repository.
+
+## AI DevOps Assistant Pipeline
+
+`azure-pipelines-ai-devops.yml` uses the same central templates as the
+microservices:
+
+1. Build and test the assistant.
+2. Run secret scan and SonarQube.
+3. Publish the `drop` artifact.
+4. Run Black Duck and Veracode.
+5. Build and push the `ai-devops-assistant` image to ACR using
+   `$(Build.BuildId)`.

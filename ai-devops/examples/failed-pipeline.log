@@ -1,0 +1,5 @@
+##[error] Gitleaks detected a secret finding in src/appsettings.json
+##[error] Black Duck policy violation found for package example-lib 1.0.0
+##[error] Docker build failed to solve: COPY failed no such file or directory
+##[error] Kubernetes deployment timeout: pod entered ImagePullBackOff
+

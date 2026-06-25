@@ -1,0 +1,71 @@
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - ai-devops/**
+      - ai_devops_assistant/**
+      - tests/test_ai_devops_assistant.py
+      - azure-pipelines-ai-devops.yml
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - ai-devops/**
+      - ai_devops_assistant/**
+      - tests/test_ai_devops_assistant.py
+      - azure-pipelines-ai-devops.yml
+
+variables:
+  - group: enterprise-cicd-secrets
+  - name: imageTag
+    value: $(Build.BuildId)
+
+stages:
+  - template: pipelines/templates/stages/build.yml
+    parameters:
+      serviceName: ai-devops-assistant
+      language: python
+      runtimeVersion: "3.12"
+      workingDirectory: .
+      vmImage: ubuntu-latest
+      sonarProjectKey: ai-devops-assistant
+      enableSonarQube: true
+      enableSecretScan: true
+      buildSteps:
+        - bash: |
+            python -m unittest tests.test_ai_devops_assistant
+            python -m ai_devops_assistant.cli ai-devops/examples/failed-pipeline.log --format json
+          displayName: Test AI DevOps assistant
+
+  - template: pipelines/templates/stages/publish.yml
+    parameters:
+      serviceName: ai-devops-assistant
+      vmImage: ubuntu-latest
+      artifactPath: ai_devops_assistant
+      artifactName: drop
+
+  - template: pipelines/templates/stages/security.yml
+    parameters:
+      serviceName: ai-devops-assistant
+      vmImage: ubuntu-latest
+      workingDirectory: .
+      artifactName: drop
+      veracodeApplicationProfile: ai-devops-assistant
+      enableBlackDuck: true
+      enableVeracode: true
+
+  - template: pipelines/templates/stages/container.yml
+    parameters:
+      serviceName: ai-devops-assistant
+      vmImage: ubuntu-latest
+      dockerfile: ai-devops/Dockerfile
+      dockerBuildContext: .
+      imageRepository: ai-devops-assistant
+      imageTag: $(Build.BuildId)
+      enabled: true
+

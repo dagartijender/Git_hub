@@ -5,7 +5,7 @@ description = "Minimal Python service used to demonstrate Azure DevOps and ArgoC
 requires-python = ">=3.12"
 
 [tool.coverage.run]
-source = ["src"]
+source = ["src", "ai_devops_assistant"]
 
 [tool.coverage.report]
 fail_under = 80
